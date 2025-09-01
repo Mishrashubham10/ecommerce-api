@@ -1,0 +1,17 @@
+{
+    "email": "manoj@gmail.com",
+    "username": "manoj",
+    "password": "Manoj1234",
+    "firstName": "Manoj",
+    "lastName": "Parmar",
+    "phone": "+91 7400203430",
+    "gender": "male",
+    "datOfBirth": "31-07-2000",
+    "addresses": {
+        "street": "01 431 new your",
+        "city": "New York",
+        "state": "NY",
+        "postalCode": 400095,
+        "country": "USA"
+    }
+}
