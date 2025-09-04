@@ -1,19 +1,36 @@
 import { Router } from 'express';
 import {
+  getMe,
   login,
   logout,
-  refresh,
-  register,
+  registerAdmin,
+  registerCustomer,
   registerSeller,
 } from '../controllers/auth.controllers.js';
+import { verifyJwt, authorizeRoles } from '../middlewares/verifyJwt.js';
 
 const router = Router();
 
-router.post('/customer/register', register);
-router.post('/seller/register', registerSeller);
-router.post('/customer/register', register);
+// Public
+router.post('/register/customer', registerCustomer);
 router.post('/login', login);
-router.get('/refresh', refresh);
 router.post('/logout', logout);
+
+// Protected (admin only)
+router.post(
+  '/register/seller',
+  verifyJwt,
+  authorizeRoles('Admin'),
+  registerSeller
+);
+router.post(
+  '/register/admin',
+  verifyJwt,
+  authorizeRoles('Admin'),
+  registerAdmin
+);
+
+// Protected route to get current user
+router.get('/me', verifyJwt, getMe);
 
 export default router;

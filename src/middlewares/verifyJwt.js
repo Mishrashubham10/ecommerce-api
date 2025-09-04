@@ -4,13 +4,9 @@ import { User } from '../models/User.js';
 // JSON WEB TOKEN FOR VERIFYING USER
 export const verifyJwt = async (req, res, next) => {
   try {
-    const authHeader = req.headers?.authorization || req.headers?.Authorization;
+    const token = req.cookies?.token;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Not authorized, no token' });
-    }
-
-    let token = authHeader.split(' ')[1];
+    console.log("Token using cookie", token);
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
@@ -29,7 +25,7 @@ export const verifyJwt = async (req, res, next) => {
 
     next();
   } catch (err) {
-    console.error('❌ JWT verification error:', err.message);
+    console.error('JWT verification error:', err.message);
     return res.status(401).json({ message: 'Not authorized, token failed' });
   }
 };

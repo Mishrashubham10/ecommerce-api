@@ -21,12 +21,14 @@ const app = express();
 app.use(
   cors({
     origin: [
-      'http://localhost:3000', // local frontend (dev)
-      'https://ecommerce-two-jade-45.vercel.app', // deployed frontend (prod)
+      'http://localhost:3000',
     ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
 app.use(cookieParse());
 app.use(express.static('public'));
 app.use(express.json({ limit: '10kb' }));

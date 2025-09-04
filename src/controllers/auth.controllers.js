@@ -4,70 +4,44 @@ import jwt from 'jsonwebtoken';
 
 const isEmpty = (value) => !value || value.trim() === '';
 
-// @desc Register
-// @route POST /auth/register
-// @access Public
-export const register = async (req, res) => {
-  // GETTING THE DATA FROM THE USER
-  const { email, password, username, role } = req.body;
+// ==================== CUSTOMER REGISTRATION ====================
+export const registerCustomer = async (req, res) => {
+  const { username, email, password } = req.body;
 
-  // AUTHENTICATION CHECK FOR EMPTY FIELDS
-  if (isEmpty(email) || isEmpty(password) || isEmpty(username)) {
-    return res.status(400).json({ message: 'All fields are required *' });
+  // Validation
+  if (isEmpty(username) || isEmpty(email) || isEmpty(password)) {
+    return res.status(400).json({ message: 'All fields are required' });
   }
-
   if (password.length < 6) {
     return res
       .status(400)
-      .json({ error: 'Password must be at least 6 characters' });
+      .json({ message: 'Password must be at least 6 characters' });
   }
 
   try {
-    // NOW CHECK IF THE USER ALREADY AXISTS
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }],
-    });
-
-    // IF USER ALREADY EXISTS THROW THIS ERROR
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res
-        .status(409)
-        .json({ error: 'User already exists with this credentials' });
+      return res.status(409).json({ message: 'User already exists' });
     }
 
-    // HASH PASSWORD
-    const hashedPwd = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ROLE CHECKING
-    let assignedRole = 'Customer';
-
-    if (role === 'Admin' && role) {
-      assignedRole = role;
-    }
-
-    // CREATE A NEW USER
-    const user = {
+    const user = await User.create({
       username,
       email,
-      password: hashedPwd,
-      role: assignedRole,
-    };
-
-    const newUser = await User.create(user);
-
-    res.status(201).json({
-      message: `User registered ${newUser.username} successfully`,
+      password: hashedPassword,
+      role: 'Customer',
     });
-  } catch (err) {
+
     res
-      .status(500)
-      .json({ error: err.message || 'Error while registering user' });
+      .status(201)
+      .json({ message: `Customer ${user.username} registered successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Server error' });
   }
 };
 
-// @desc REGISTER SELLER
-// @route POST /auth/register/seller
-// @access PRIVATE - ONLY FOR SELLER
+// ==================== SELLER REGISTRATION (ADMIN ONLY) ====================
 export const registerSeller = async (req, res) => {
   const { businessName, email, password, gstin } = req.body;
 
@@ -75,31 +49,31 @@ export const registerSeller = async (req, res) => {
     isEmpty(businessName) ||
     isEmpty(email) ||
     isEmpty(password) ||
-    isEmpty(confirmPassword) ||
     isEmpty(gstin)
   ) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return res.status(400).json({ message: 'All fields are required' });
   }
 
   if (password.length < 6) {
     return res
       .status(400)
-      .json({ error: 'Password must be at least 6 characters' });
+      .json({ message: 'Password must be at least 6 characters' });
   }
 
+  // GSTIN validation
   const gstRegex = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}$/i;
   if (!gstRegex.test(gstin)) {
-    return res.status(400).json({ error: 'Invalid GSTIN format' });
+    return res.status(400).json({ message: 'Invalid GSTIN format' });
   }
 
   try {
-    const existing = await User.findOne({ email });
-    if (existing)
-      return res.status(409).json({ error: 'Email already in use' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(409).json({ message: 'Email already in use' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({
+    const user = await User.create({
       businessName,
       email,
       password: hashedPassword,
@@ -107,126 +81,125 @@ export const registerSeller = async (req, res) => {
       role: 'Seller',
     });
 
-    await user.save();
-    res.status(201).json({ message: 'Seller registered successfully' });
+    res
+      .status(201)
+      .json({ message: `Seller ${businessName} registered successfully` });
   } catch (err) {
-    res.status(500).json({ message: err.message || 'Server Error' });
+    res.status(500).json({ message: err.message || 'Server error' });
   }
 };
 
-/// @desc Login
-// @route POST /auth/login
-// @access Public
+// ==================== ADMIN REGISTRATION (ADMIN ONLY) ====================
+export const registerAdmin = async (req, res) => {
+  const { username, email, password } = req.body;
+
+  if (isEmpty(username) || isEmpty(email) || isEmpty(password)) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+  if (password.length < 6) {
+    return res
+      .status(400)
+      .json({ message: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser)
+      return res.status(409).json({ message: 'User already exists' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      role: 'Admin',
+    });
+
+    res
+      .status(201)
+      .json({ message: `Admin ${user.username} registered successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+};
+
+// ==================== LOGIN ====================
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
+  if (isEmpty(email) || isEmpty(password)) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
   try {
-    if (isEmpty(email) || isEmpty(password)) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
-
     const user = await User.findOne({ email });
-
-    if (!user) {
+    if (!user)
       return res.status(400).json({ message: 'Invalid email or password' });
-    }
 
-    // ✅ Corrected password compare
-    const isMatchPsw = await bcrypt.compare(password, user.password);
-
-    if (!isMatchPsw) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
       return res.status(400).json({ message: 'Invalid credentials' });
-    }
 
-    // ✅ Generate tokens
+    // Generate JWT
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: '30d' }
     );
 
+    // Refresh token (optional)
     const refreshToken = jwt.sign(
       { email: user.email },
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: '30d' }
     );
 
-    // ✅ Save refresh token cookie
-    res.cookie('jwt', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    // ✅ Save access token cookie (important for middleware)
+    // Cookies
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // 'lax' works in dev for cross-origin
       maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie('jwt', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
       message: 'Login successful',
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user._id, email: user.email, role: user.role },
     });
   } catch (err) {
-    res
-      .status(500)
-      .json({ error: err.message || 'Error while logging in user' });
+    res.status(500).json({ message: err.message || 'Server error' });
   }
 };
 
-// @desc Refresh
-// @route GET /auth/refresh
-// @access Public - because access token has expired
-export const refresh = (req, res) => {
-  const cookies = req.cookies;
+// ==================== GET CURRENT USER ====================
+export const getMe = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
 
-  if (!cookies?.jwt) return res.status(401).json({ message: 'Unauthorized' });
-
-  const refreshToken = cookies.jwt;
-
-  jwt.verify(
-    refreshToken,
-    process.env.REFRESH_TOKEN_SECRET,
-    async (err, decoded) => {
-      if (err) return res.status(403).json({ message: 'Forbidden' });
-
-      const foundUser = await User.findOne({
-        email: decoded.email,
-      }).exec();
-
-      if (!foundUser) return res.status(401).json({ message: 'Unauthorized' });
-
-      const accessToken = jwt.sign(
-        {
-          UserInfo: {
-            email: foundUser.email,
-            role: foundUser.role,
-          },
-        },
-        process.env.ACCESS_TOKEN_SECRET,
-        { expiresIn: '15m' }
-      );
-
-      res.json({ accessToken });
-    }
-  );
+    res.status(200).json({
+      user: {
+        id: req.user._id,
+        username: req.user.username || req.user.businessName,
+        email: req.user.email,
+        role: req.user.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
 };
 
-// @desc Logout
-// @route POST /auth/logout
-// @access Public - just to clear cookie if exists
-export const logout = (req, res) => {
-  const cookies = req.cookies;
-  if (!cookies?.jwt) return res.sendStatus(204); //No content
-  res.clearCookie('jwt', { secure: true });
-  res.json({ message: 'Cookie cleared' });
+// ==================== LOGOUT ====================
+export const logout = async (req, res) => {
+  res.clearCookie('token');
+  res.clearCookie('jwt');
+  res.status(200).json({ message: 'Logged out successfully' });
 };
